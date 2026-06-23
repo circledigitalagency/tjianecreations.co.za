@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useLoaderData, useSearchParams } from "@remix-run/react";
+import { Form, Link, useLoaderData, useSearchParams } from "@remix-run/react";
 import MainLayout from "~/components/_layout/main";
 import { pool } from "~/db.server";
 
@@ -106,68 +106,75 @@ export default function Shop() {
 			<div className="px-16 py-16">
 				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
 					{(products as any[]).map((product) => (
-						<div
+						<Link
 							key={product.id}
-							className="bg-cream-white cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(44,31,20,0.12)]"
+							to={`/shop/${product.slug}`}
+							className="no-underline block bg-cream-white cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(44,31,20,0.12)]"
 						>
-							{/* Image or fallback gradient */}
-							<div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-tan-light to-tan">
-								{product.image_url ? (
-									<img
-										src={product.image_url}
-										alt={product.name}
-										className="w-full h-full object-cover"
-									/>
-								) : (
-									<div className="w-full h-full flex items-center justify-center text-[3rem] text-bark-mid opacity-30">
-										👜
-									</div>
-								)}
+							<div>
+								{/* Image or fallback gradient */}
+								<div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-tan-light to-tan">
+									{product.image_url ? (
+										<img
+											src={product.image_url}
+											alt={product.name}
+											className="w-full h-full object-cover"
+										/>
+									) : (
+										<div className="w-full h-full flex items-center justify-center text-[3rem] text-bark-mid opacity-30">
+											👜
+										</div>
+									)}
 
-								{/* Badges */}
-								<div className="absolute top-4 left-4 flex flex-col gap-1">
-									{product.is_new ? (
-										<span className="bg-accent text-cream-white text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
-											New
+									{/* Badges */}
+									<div className="absolute top-4 left-4 flex flex-col gap-1">
+										{product.is_new ? (
+											<span className="bg-accent text-cream-white text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
+												New
+											</span>
+										) : null}
+										{product.is_vegan ? (
+											<span className="bg-bark text-cream text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
+												Vegan
+											</span>
+										) : null}
+									</div>
+								</div>
+
+								<div className="p-5">
+									<div className="font-display font-semibold text-[1.15rem] text-bark mb-1">
+										{product.name}
+									</div>
+									<div className="text-[0.72rem] tracking-[0.12em] uppercase text-tan-dark mb-1">
+										{product.category_name}
+									</div>
+									{product.leather_type && (
+										<div className="text-[0.7rem] text-bark-mid mb-3">
+											{product.leather_type}
+										</div>
+									)}
+									<div className="flex items-center justify-between mt-3">
+										<span className="font-display font-semibold text-[1.2rem] text-bark">
+											R {Number(product.base_price).toLocaleString("en-ZA")}
 										</span>
-									) : null}
-									{product.is_vegan ? (
-										<span className="bg-bark text-cream text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
-											Vegan
-										</span>
-									) : null}
+										<Form method="post" action="/cart/add">
+											<input
+												type="hidden"
+												name="productId"
+												value={product.id}
+											/>
+											<input type="hidden" name="redirectTo" value="/shop" />
+											<button
+												type="submit"
+												className="bg-bark text-cream py-2 px-4 text-[0.72rem] tracking-[0.1em] uppercase font-body transition-colors hover:bg-accent cursor-pointer border-0"
+											>
+												Add to Cart
+											</button>
+										</Form>
+									</div>
 								</div>
 							</div>
-
-							<div className="p-5">
-								<div className="font-display font-semibold text-[1.15rem] text-bark mb-1">
-									{product.name}
-								</div>
-								<div className="text-[0.72rem] tracking-[0.12em] uppercase text-tan-dark mb-1">
-									{product.category_name}
-								</div>
-								{product.leather_type && (
-									<div className="text-[0.7rem] text-bark-mid mb-3">
-										{product.leather_type}
-									</div>
-								)}
-								<div className="flex items-center justify-between mt-3">
-									<span className="font-display font-semibold text-[1.2rem] text-bark">
-										R {Number(product.base_price).toLocaleString("en-ZA")}
-									</span>
-									<Form method="post" action="/cart/add">
-										<input type="hidden" name="productId" value={product.id} />
-										<input type="hidden" name="redirectTo" value="/shop" />
-										<button
-											type="submit"
-											className="bg-bark text-cream py-2 px-4 text-[0.72rem] tracking-[0.1em] uppercase font-body transition-colors hover:bg-accent cursor-pointer border-0"
-										>
-											Add to Cart
-										</button>
-									</Form>
-								</div>
-							</div>
-						</div>
+						</Link>
 					))}
 				</div>
 

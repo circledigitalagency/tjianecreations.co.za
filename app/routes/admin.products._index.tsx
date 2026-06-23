@@ -2,6 +2,8 @@ import { json } from "@remix-run/node";
 import { useLoaderData, Link } from "@remix-run/react";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
+import { Share2, Pencil, Check } from "lucide-react";
+import { useState } from "react";
 
 export async function loader() {
 	const [products] = await pool.query(`
@@ -80,7 +82,15 @@ export default function ProductsList() {
 										{p.is_active ? "Active" : "Hidden"}
 									</span>
 								</td>
-								<td className="px-4 py-3 text-right">
+								<td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+									{/* Share */}
+									<ShareButton
+										slug={p.slug}
+										name={p.name}
+										price={p.base_price}
+									/>
+
+									{/* Edit */}
 									<Link
 										to={`/admin/products/${p.id}/edit`}
 										className="text-accent text-[0.78rem] hover:underline no-underline"
@@ -107,5 +117,56 @@ export default function ProductsList() {
 				</table>
 			</div>
 		</AdminLayout>
+	);
+}
+
+function ShareButton({
+	slug,
+	name,
+	price,
+}: {
+	slug: string;
+	name: string;
+	price: number;
+}) {
+	const [copied, setCopied] = useState(false);
+
+	async function handleShare() {
+		const url = `${window.location.origin}/shop/${slug}`;
+		const text = `Check out ${name} on Tjiane Creations — R ${Number(
+			price,
+		).toLocaleString("en-ZA")}`;
+
+		if (navigator.share) {
+			try {
+				await navigator.share({ title: name, text, url });
+			} catch {
+				// cancelled
+			}
+		} else {
+			await navigator.clipboard.writeText(url);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2500);
+		}
+	}
+
+	return (
+		<button
+			onClick={handleShare}
+			title="Share product"
+			className="flex items-center gap-1.5 text-[0.72rem] text-bark-mid hover:text-accent transition-colors cursor-pointer bg-transparent border-0 p-0"
+		>
+			{copied ? (
+				<>
+					<Check size={13} className="text-green-600" />
+					<span className="text-green-600">Copied!</span>
+				</>
+			) : (
+				<>
+					<Share2 size={13} />
+					<span>Share</span>
+				</>
+			)}
+		</button>
 	);
 }
