@@ -10,6 +10,9 @@ declare module "@remix-run/node" {
 }
 
 export default defineConfig({
+	server: {
+		allowedHosts: ["pluck-unvented-shortness.ngrok-free.dev"],
+	},
 	plugins: [
 		remix({
 			future: {

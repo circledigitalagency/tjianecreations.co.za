@@ -1,0 +1,36 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
+	}
+
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		@apply font-body bg-cream text-bark overflow-x-hidden;
+	}
+}
+
+@layer utilities {
+	.text-eyebrow {
+		@apply text-[0.72rem] tracking-[0.25em] uppercase;
+	}
+
+	.text-nav {
+		@apply text-[0.78rem] tracking-[0.15em] uppercase font-normal;
+	}
+
+	/* Marquee animation for the scrolling bar */
+	.animate-marquee {
+		animation: marquee 25s linear infinite;
+	}
+}
