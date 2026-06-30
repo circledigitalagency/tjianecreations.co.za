@@ -8,12 +8,19 @@ import {
 	LogOut,
 } from "lucide-react";
 
+import { Building2 } from "lucide-react"; // add to imports
+
 const navItems = [
 	{ label: "Dashboard", to: "/admin", icon: LayoutDashboard },
 	{ label: "Products", to: "/admin/products", icon: Package },
 	{ label: "Orders", to: "/admin/orders", icon: ShoppingCart },
 	{ label: "Customers", to: "/admin/customers", icon: Users },
 	{ label: "Custom Orders", to: "/admin/custom-orders", icon: Pencil },
+	{
+		label: "Corporate Enquiries",
+		to: "/admin/corporate-enquiries",
+		icon: Building2,
+	},
 ];
 
 export default function AdminLayout({

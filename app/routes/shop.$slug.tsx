@@ -1,10 +1,11 @@
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData, useNavigate } from "@remix-run/react";
 import * as React from "react";
-import { Share2, Check, Link as LinkIcon } from "lucide-react";
+import { Share2, Check, Link as LinkIcon, ArrowLeft } from "lucide-react";
 import MainLayout from "~/components/_layout/main";
 import { pool } from "~/db.server";
+import { Download } from "lucide-react";
 
 export async function loader({ params }: LoaderFunctionArgs) {
 	const { slug } = params;
@@ -93,6 +94,8 @@ export default function ProductDetail() {
 	const [copied, setCopied] = React.useState(false);
 	const [addedToCart, setAddedToCart] = React.useState(false);
 
+	const navigate = useNavigate();
+
 	async function handleShare() {
 		const shareData = {
 			title: product.name,
@@ -120,6 +123,13 @@ export default function ProductDetail() {
 	return (
 		<MainLayout>
 			<div className="px-8 md:px-16 py-16 max-w-6xl mx-auto">
+				<button
+					onClick={() => navigate(-1)}
+					className="inline-flex items-center gap-2 text-[0.78rem] tracking-[0.1em] uppercase text-bark-mid hover:text-accent transition-colors cursor-pointer bg-transparent border-0 p-0 mb-8"
+				>
+					<ArrowLeft size={15} />
+					Back
+				</button>
 				<div className="grid md:grid-cols-2 gap-16">
 					{/* Images */}
 					<div>
@@ -221,6 +231,18 @@ export default function ProductDetail() {
 								</button>
 							</form>
 
+							{/* Size chart download — shown only for Kids Shoes */}
+							{product.category_name === "Kids Shoes" && (
+								<a
+									href="/size-charts/kids-shoes-printable-guide.pdf"
+									download
+									className="flex items-center gap-2 text-[0.78rem] text-accent hover:underline mb-6"
+								>
+									<Download size={15} />
+									Download Printable Foot Guide (PDF)
+								</a>
+							)}
+
 							{/* Share button */}
 							<button
 								onClick={handleShare}
@@ -243,14 +265,6 @@ export default function ProductDetail() {
 									</>
 								)}
 							</button>
-						</div>
-
-						{/* Social share links — always visible */}
-						<div className="border-t border-tan/20 pt-5">
-							<p className="text-[0.7rem] tracking-[0.15em] uppercase text-bark-mid mb-3">
-								Share to
-							</p>
-							<SocialShareButtons product={product} />
 						</div>
 
 						{/* Care instructions */}

@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import type { MetaFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, Link, useLoaderData, useSearchParams } from "@remix-run/react";
+import { Download } from "lucide-react";
 import MainLayout from "~/components/_layout/main";
 import { pool } from "~/db.server";
 
@@ -101,6 +102,22 @@ export default function Shop() {
 					</button>
 				))}
 			</div>
+
+			{activeCategory === "kids" && (
+				<div className="px-16 py-4 bg-tan-light/40 border-b border-tan/20 flex items-center justify-between">
+					<p className="text-[0.85rem] text-bark-mid">
+						Not sure which size to choose?
+					</p>
+					<a
+						href="/size-charts/kids-shoes-printable-guide.pdf"
+						download
+						className="text-[0.78rem] text-accent hover:underline flex items-center gap-1.5"
+					>
+						<Download size={15} />
+						Download Printable Foot Guide (PDF)
+					</a>
+				</div>
+			)}
 
 			{/* Product grid */}
 			<div className="px-16 py-16">

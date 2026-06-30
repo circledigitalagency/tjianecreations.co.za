@@ -6,6 +6,8 @@ import MarqueeBar from "~/components/_layout/marquee";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { pool } from "~/db.server";
+import { getGoogleReviews } from "~/reviews.server";
+import GoogleReviews from "~/components/google/google-reviews";
 
 export const meta: MetaFunction = () => [
 	{ title: "Tjiane Creations — Handcrafted Leather Bags" },
@@ -38,11 +40,13 @@ export async function loader() {
     LIMIT 3`,
 	)) as any;
 
-	return json({ featuredProducts });
+	const reviewsData = await getGoogleReviews();
+
+	return json({ featuredProducts, reviewsData });
 }
 
 export default function Index() {
-	const { featuredProducts } = useLoaderData<typeof loader>();
+	const { featuredProducts, reviewsData } = useLoaderData<typeof loader>();
 	return (
 		<MainLayout>
 			{/* ── HERO ── */}
@@ -210,6 +214,16 @@ export default function Index() {
 					</p>
 				</div>
 			</section>
+
+			{reviewsData && (
+				<GoogleReviews
+					businessName={reviewsData.businessName}
+					rating={reviewsData.rating}
+					totalReviews={reviewsData.totalReviews}
+					googleUrl={reviewsData.googleUrl}
+					reviews={reviewsData.reviews}
+				/>
+			)}
 		</MainLayout>
 	);
 }

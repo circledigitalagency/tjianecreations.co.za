@@ -47,7 +47,43 @@ export default function About() {
 				))}
 			</div>
 
-			{/* Story */}
+			{/* Founder section */}
+			<div className="px-16 py-20 grid md:grid-cols-2 gap-16 items-center border-b border-tan/20">
+				{/* Photo */}
+				<div className="aspect-[4/5] bg-gradient-to-br from-tan-light to-tan overflow-hidden">
+					{/* Replace with her actual photo once uploaded */}
+					<div className="w-full h-full flex items-center justify-center text-[5rem] opacity-25">
+						📷
+					</div>
+				</div>
+
+				{/* Story */}
+				<div>
+					<span className="text-eyebrow text-tan-dark block mb-3">
+						Meet the Maker
+					</span>
+					<h2 className="font-display font-light text-[2rem] text-bark mb-6">
+						Hi, I'm Hloniphani.
+					</h2>
+					<div className="space-y-4 text-[0.93rem] leading-[1.9] text-bark-mid font-light">
+						<p>
+							[Her personal story goes here — how she got into leatherwork, what
+							drew her to it, and what the craft means to her. This is the
+							section where her voice should come through directly.]
+						</p>
+						<p>
+							[A line or two about her process — working from a kitchen table,
+							learning by hand, the patience the craft demands.]
+						</p>
+						<p>
+							[Optional closing line tying her personal mission to what
+							customers get when they buy from her.]
+						</p>
+					</div>
+				</div>
+			</div>
+
+			{/* Story — why leather, why handmade */}
 			<div className="px-16 py-20 grid md:grid-cols-2 gap-20 items-start">
 				<div>
 					<span className="text-eyebrow text-tan-dark block mb-3">

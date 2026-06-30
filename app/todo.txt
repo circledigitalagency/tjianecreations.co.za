@@ -1,7 +1,6 @@
 #Checkout
 -- Courier guy
 -- Emails to eva and customer 
--- Share product 
 -- Kids leather shoes 
     - Downloadable size charts 
 

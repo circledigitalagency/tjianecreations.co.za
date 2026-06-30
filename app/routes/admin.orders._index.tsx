@@ -8,6 +8,7 @@ import {
 } from "@remix-run/react";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
+import { createShipment } from "~/shiplogic.server";
 
 export const meta: MetaFunction = () => [
 	{ title: "Admin Orders" },

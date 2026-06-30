@@ -3,8 +3,8 @@ import { useRouteLoaderData } from "@remix-run/react";
 import { ShoppingCartIcon } from "lucide-react";
 
 const navItems = [
-	{ label: "Shop", to: "/shop" },
 	{ label: "Custom Orders", to: "/custom" },
+	{ label: "Repairs & Care", to: "/repairs" },
 	{ label: "Corporate", to: "/corporate" },
 	{ label: "About", to: "/about" },
 ];
