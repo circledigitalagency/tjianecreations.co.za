@@ -17,12 +17,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url);
 	const category = url.searchParams.get("category");
 
-	// Get all active categories for the filter bar
 	const [categories] = (await pool.query(
-		"SELECT id, slug, name FROM categories WHERE is_active = 1 ORDER BY sort_order",
+		`SELECT c.id, c.slug, c.name
+   FROM categories c
+   WHERE c.is_active = 1
+   AND EXISTS (
+     SELECT 1 FROM products p
+     WHERE p.category_id = c.id
+     AND p.is_active = 1
+   )
+   ORDER BY c.sort_order`,
 	)) as any;
 
-	// Get products — filter by category slug if one is selected
 	const [products] = (await pool.query(
 		`SELECT
       p.id,
@@ -35,10 +41,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       c.slug  AS category_slug,
       lt.name AS leather_type,
       lt.is_vegan,
-      -- First image only (sort_order = 0 is hero)
+      -- ✅ First image (hero)
       (SELECT url FROM product_images pi
        WHERE pi.product_id = p.id
-       ORDER BY pi.sort_order LIMIT 1) AS image_url
+       ORDER BY pi.sort_order LIMIT 1) AS image_url,
+      -- ✅ Second image (hover reveal) — null if only one photo exists
+      (SELECT url FROM product_images pi
+       WHERE pi.product_id = p.id
+       ORDER BY pi.sort_order LIMIT 1 OFFSET 1) AS hover_image_url
     FROM products p
     JOIN categories c ON p.category_id = c.id
     LEFT JOIN leather_types lt ON p.leather_type_id = lt.id
@@ -129,14 +139,27 @@ export default function Shop() {
 							className="no-underline block bg-cream-white cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(44,31,20,0.12)]"
 						>
 							<div>
-								{/* Image or fallback gradient */}
-								<div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-tan-light to-tan">
+								{/* Image with hover-swap */}
+								<div className="aspect-[4/5] relative overflow-hidden bg-gradient-to-br from-tan-light to-tan group">
 									{product.image_url ? (
-										<img
-											src={product.image_url}
-											alt={product.name}
-											className="w-full h-full object-cover"
-										/>
+										<>
+											{/* Base image */}
+											<img
+												src={product.image_url}
+												alt={product.name}
+												className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-300 ${
+													product.hover_image_url ? "group-hover:opacity-0" : ""
+												}`}
+											/>
+											{/* Hover image — only rendered if a second photo exists */}
+											{product.hover_image_url && (
+												<img
+													src={product.hover_image_url}
+													alt={product.name}
+													className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+												/>
+											)}
+										</>
 									) : (
 										<div className="w-full h-full flex items-center justify-center text-[3rem] text-bark-mid opacity-30">
 											👜
@@ -144,7 +167,7 @@ export default function Shop() {
 									)}
 
 									{/* Badges */}
-									<div className="absolute top-4 left-4 flex flex-col gap-1">
+									<div className="absolute top-4 left-4 flex flex-col gap-1 z-10">
 										{product.is_new ? (
 											<span className="bg-accent text-cream-white text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
 												New

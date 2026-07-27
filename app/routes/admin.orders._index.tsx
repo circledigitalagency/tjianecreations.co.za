@@ -8,7 +8,10 @@ import {
 } from "@remix-run/react";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
-import { createShipment } from "~/shiplogic.server";
+import { createShipment, getWaybillUrl } from "~/shiplogic.server";
+import { FileDown } from "lucide-react";
+import { Truck, ExternalLink } from "lucide-react";
+import { sendOrderShippedEmail } from "~/email.server";
 
 export const meta: MetaFunction = () => [
 	{ title: "Admin Orders" },
@@ -46,21 +49,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 	const [orders] = (await pool.query(
 		`SELECT
-      o.id,
-      o.status,
-      o.total_amount,
-      o.shipping_method,
-      o.shipping_cost,
-      o.shipping_address,
-      o.tracking_number,
-      o.yoco_charge_id,
-      o.created_at,
-      c.name  AS customer_name,
-      c.email AS customer_email,
-      c.phone AS customer_phone,
-      (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
-    FROM orders o
-    JOIN customers c ON o.customer_id = c.id
+    o.id, o.status, o.total_amount, o.shipping_method,
+    o.shipping_address,
+    o.tracking_number, o.yoco_charge_id, o.created_at,
+    c.name  AS customer_name,
+    c.email AS customer_email,
+    c.phone AS customer_phone,
+    (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
+  FROM orders o
+  JOIN customers c ON o.customer_id = c.id
     WHERE 1=1
       ${statusFilter !== "all" ? "AND o.status = ?" : ""}
       ${search ? "AND (c.name LIKE ? OR c.email LIKE ? OR o.id = ?)" : ""}
@@ -90,20 +87,125 @@ export async function action({ request }: ActionFunctionArgs) {
 	const _action = form.get("_action") as string;
 	const orderId = form.get("orderId");
 
+	if (_action === "create_waybill") {
+		const orderId = form.get("orderId") as string;
+		const customerName = form.get("customerName") as string;
+		const customerPhone = form.get("customerPhone") as string;
+		const customerEmail = form.get("customerEmail") as string;
+		const shippingStreet = form.get("shippingStreet") as string;
+		const shippingSuburb = form.get("shippingSuburb") as string;
+		const shippingCity = form.get("shippingCity") as string;
+		const shippingPostal = form.get("shippingPostal") as string;
+		const shippingProvince = form.get("shippingProvince") as string;
+
+		const shipment = await createShipment({
+			orderId: parseInt(orderId),
+			customerName,
+			customerPhone,
+			customerEmail,
+			deliveryAddress: shippingStreet,
+			deliverySuburb: shippingSuburb,
+			deliveryCity: shippingCity,
+			deliveryPostal: shippingPostal,
+			deliveryProvince: shippingProvince,
+		});
+
+		console.log("ShipLogic response:", JSON.stringify(shipment, null, 2));
+
+		if (shipment.id) {
+			// Save waybill number + update status to shipped
+			await pool.query(
+				`UPDATE orders
+       SET tracking_number = ?,
+           status = 'shipped'
+       WHERE id = ?`,
+				[shipment.tracking_reference ?? shipment.id, orderId],
+			);
+
+			// Get waybill PDF URL
+			const waybill = await getWaybillUrl(shipment.id);
+			console.log("Waybill PDF:", waybill);
+
+			return json({
+				ok: true,
+				waybillUrl: waybill?.url ?? null,
+				shipmentId: shipment.id,
+			});
+		}
+
+		return json(
+			{ ok: false, error: shipment.message ?? "Failed to create waybill" },
+			{ status: 400 },
+		);
+	}
+
 	if (_action === "update_status") {
-		const status = form.get("status");
+		const status = form.get("status") as string;
+		const orderId = form.get("orderId") as string;
+
 		await pool.query("UPDATE orders SET status = ? WHERE id = ?", [
 			status,
 			orderId,
 		]);
+
+		// Send shipping email when status changes to shipped
+		if (status === "shipped") {
+			const [[order]] = (await pool.query(
+				`SELECT o.id, o.tracking_number, o.shipping_method,
+              c.name AS customer_name, c.email AS customer_email
+       FROM orders o
+       JOIN customers c ON o.customer_id = c.id
+       WHERE o.id = ?`,
+				[orderId],
+			)) as any;
+
+			try {
+				await sendOrderShippedEmail({
+					id: order.id,
+					customerName: order.customer_name,
+					customerEmail: order.customer_email,
+					trackingNumber: order.tracking_number,
+					shippingMethod: order.shipping_method,
+				});
+			} catch (e) {
+				console.error("Failed to send shipping email:", e);
+			}
+		}
+
+		return json({ ok: true });
 	}
 
 	if (_action === "update_tracking") {
-		const tracking = form.get("tracking_number");
+		const tracking = form.get("tracking_number") as string;
+		const orderId = form.get("orderId") as string;
+
 		await pool.query(
 			"UPDATE orders SET tracking_number = ?, status = 'shipped' WHERE id = ?",
 			[tracking, orderId],
 		);
+
+		const [[order]] = (await pool.query(
+			`SELECT o.id, o.tracking_number, o.shipping_method,
+            c.name AS customer_name, c.email AS customer_email
+     FROM orders o
+     JOIN customers c ON o.customer_id = c.id
+     WHERE o.id = ?`,
+			[orderId],
+		)) as any;
+
+		try {
+			await sendOrderShippedEmail({
+				id: order.id,
+				customerName: order.customer_name,
+				customerEmail: order.customer_email,
+				trackingNumber: order.tracking_number,
+				shippingMethod: order.shipping_method,
+			});
+		} catch (e) {
+			console.error("Failed to send shipping email:", e);
+		}
+
+		return json({ ok: true });
 	}
 
 	return json({ ok: true });
@@ -125,31 +227,40 @@ export default function AdminOrders() {
 			</div>
 
 			{/* Status filter tabs */}
-			<div className="flex gap-2 flex-wrap mb-5">
-				{[
-					{ key: "all", label: "All" },
-					...allStatuses.map((s) => ({ key: s, label: s.replace("_", " ") })),
-				].map(({ key, label }) =>
-					countMap[key] !== undefined || key === "all" ? (
-						<a
-							key={key}
-							href={`/admin/orders${key === "all" ? "" : `?status=${key}`}${
-								search ? `&search=${search}` : ""
-							}`}
-							className={`px-3 py-1.5 text-[0.72rem] tracking-[0.1em] uppercase rounded transition-colors no-underline ${
-								statusFilter === key ||
-								(key === "all" && statusFilter === "all")
-									? "bg-bark text-cream"
-									: "bg-white border border-tan/30 text-bark-mid hover:border-tan"
-							}`}
-						>
-							{label}
-							{countMap[key] !== undefined && (
-								<span className="ml-1.5 opacity-60">({countMap[key]})</span>
-							)}
-						</a>
-					) : null,
-				)}
+			<div className="flex justify-between">
+				<div className="flex gap-2 flex-wrap mb-5">
+					{[
+						{ key: "all", label: "All" },
+						...allStatuses.map((s) => ({ key: s, label: s.replace("_", " ") })),
+					].map(({ key, label }) =>
+						countMap[key] !== undefined || key === "all" ? (
+							<a
+								key={key}
+								href={`/admin/orders${key === "all" ? "" : `?status=${key}`}${
+									search ? `&search=${search}` : ""
+								}`}
+								className={`px-3 py-1.5 text-[0.72rem] tracking-[0.1em] uppercase rounded transition-colors no-underline ${
+									statusFilter === key ||
+									(key === "all" && statusFilter === "all")
+										? "bg-bark text-cream"
+										: "bg-white border border-tan/30 text-bark-mid hover:border-tan"
+								}`}
+							>
+								{label}
+								{countMap[key] !== undefined && (
+									<span className="ml-1.5 opacity-60">({countMap[key]})</span>
+								)}
+							</a>
+						) : null,
+					)}
+				</div>
+				<a
+					href="/admin/export/orders"
+					className="flex items-center gap-2 border border-tan/40 text-bark-mid px-4 py-2 text-[0.75rem] tracking-[0.1em] uppercase no-underline hover:border-tan hover:text-bark transition-colors"
+				>
+					<FileDown size={14} />
+					Export Table
+				</a>
 			</div>
 
 			{/* Search */}
@@ -389,6 +500,114 @@ function OrderRow({ order, zebra }: { order: any; zebra: boolean }) {
 									Saving will also mark order as Shipped
 								</p>
 							</div>
+
+							{/* Waybill + tracking section */}
+							<div>
+								<p className="text-[0.7rem] tracking-[0.15em] uppercase text-bark-mid mb-2">
+									Courier Guy
+								</p>
+
+								{order.tracking_number ? (
+									// Already has a waybill
+									<div className="space-y-3">
+										<p className="text-sm font-medium text-bark">
+											Waybill: {order.tracking_number}
+										</p>
+										<a
+											href={`https://thecourierguy.co.za/tracking/?waybill=${order.tracking_number}`}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="inline-flex items-center gap-1.5 text-[0.72rem] text-accent hover:underline no-underline"
+										>
+											Track parcel <ExternalLink size={11} />
+										</a>
+									</div>
+								) : (
+									// Create waybill form
+									<Form method="post">
+										<input
+											type="hidden"
+											name="_action"
+											value="create_waybill"
+										/>
+										<input type="hidden" name="orderId" value={order.id} />
+										<input
+											type="hidden"
+											name="customerName"
+											value={order.customer_name}
+										/>
+										<input
+											type="hidden"
+											name="customerPhone"
+											value={order.customer_phone ?? ""}
+										/>
+										<input
+											type="hidden"
+											name="customerEmail"
+											value={order.customer_email}
+										/>
+										<input
+											type="hidden"
+											name="shippingStreet"
+											value={
+												order.shipping_street ?? order.shipping_address ?? ""
+											}
+										/>
+										<input
+											type="hidden"
+											name="shippingSuburb"
+											value={order.shipping_suburb ?? ""}
+										/>
+										<input
+											type="hidden"
+											name="shippingCity"
+											value={order.shipping_city ?? ""}
+										/>
+										<input
+											type="hidden"
+											name="shippingPostal"
+											value={order.shipping_postal ?? ""}
+										/>
+										<input
+											type="hidden"
+											name="shippingProvince"
+											value={order.shipping_province ?? ""}
+										/>
+										<button
+											type="submit"
+											className="flex items-center gap-2 bg-bark text-cream px-5 py-2.5 text-[0.75rem] uppercase tracking-wider hover:bg-accent transition-colors cursor-pointer border-0"
+										>
+											<Truck size={14} />
+											Create Waybill
+										</button>
+									</Form>
+								)}
+
+								{/* Manual tracking number fallback */}
+								<div className="mt-3">
+									<Form method="post" className="flex gap-2">
+										<input
+											type="hidden"
+											name="_action"
+											value="update_tracking"
+										/>
+										<input type="hidden" name="orderId" value={order.id} />
+										<input
+											name="tracking_number"
+											type="text"
+											placeholder="Or enter manually"
+											defaultValue={order.tracking_number ?? ""}
+											className="border border-tan/40 bg-white text-bark px-3 py-1.5 text-sm outline-none focus:border-tan flex-1"
+										/>
+										<button
+											type="submit"
+											className="bg-bark text-cream px-4 py-1.5 text-[0.72rem] uppercase tracking-wide hover:bg-accent transition-colors cursor-pointer border-0"
+										>
+											Save
+										</button>
+									</Form>
+								</div>
+							</div>
 						</div>
 					</td>
 				</tr>
@@ -397,7 +616,6 @@ function OrderRow({ order, zebra }: { order: any; zebra: boolean }) {
 	);
 }
 
-// Lazy-loads order items when row is expanded
 function OrderItems({ orderId }: { orderId: number }) {
 	const [items, setItems] = React.useState<any[] | null>(null);
 
@@ -413,18 +631,41 @@ function OrderItems({ orderId }: { orderId: number }) {
 		return <p className="text-sm text-bark-mid/60 italic">No items found.</p>;
 
 	return (
-		<div className="space-y-2">
+		<div className="space-y-3">
 			{items.map((item) => (
-				<div key={item.id} className="flex justify-between text-sm gap-4">
-					<span className="text-bark">
-						{item.product_name}
-						{item.colour && ` · ${item.colour}`}
-						{item.size && ` · ${item.size}`}
-						<span className="text-bark-mid ml-1">× {item.quantity}</span>
-					</span>
-					<span className="text-bark font-medium whitespace-nowrap">
-						R {(item.unit_price * item.quantity).toLocaleString("en-ZA")}
-					</span>
+				<div key={item.id} className="flex items-center gap-3">
+					{/* Image */}
+					<div className="w-10 h-10 shrink-0 overflow-hidden bg-gradient-to-br from-tan-light to-tan rounded">
+						{item.image_url ? (
+							<img
+								src={item.image_url}
+								alt={item.product_name}
+								className="w-full h-full object-cover"
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center text-sm opacity-30">
+								👜
+							</div>
+						)}
+					</div>
+
+					{/* Details */}
+					<div className="flex-1 min-w-0">
+						<span className="text-sm text-bark font-medium truncate block">
+							{item.product_name}
+						</span>
+						{item.colour && (
+							<span className="text-[0.72rem] text-bark-mid">
+								{item.colour}
+							</span>
+						)}
+					</div>
+
+					{/* Price */}
+					<div className="text-sm text-bark font-medium shrink-0">
+						× {item.quantity} · R{" "}
+						{(item.unit_price * item.quantity).toLocaleString("en-ZA")}
+					</div>
 				</div>
 			))}
 		</div>

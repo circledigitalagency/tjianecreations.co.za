@@ -14,47 +14,15 @@ export const meta: MetaFunction = () => [
 export default function About() {
 	return (
 		<MainLayout>
-			{/* Hero quote */}
-			<div className="bg-tan-light px-16 py-24">
-				<div className="max-w-[720px]">
-					<blockquote className="font-display font-light italic text-[clamp(2rem,4vw,3.5rem)] leading-[1.2] text-bark mb-8">
-						"Made with patience, purpose, and pride."
-					</blockquote>
-					<p className="text-[0.95rem] leading-[1.9] text-bark-mid font-light">
-						Tjiane Creations is a one-woman craft studio based in Brakpan, South
-						Africa. Every bag is planned, cut, and stitched by hand — no
-						shortcuts, no compromises. When you buy a Tjiane bag, you own
-						something that will last for years and only gets better with time.
-					</p>
-				</div>
-			</div>
-
-			{/* Stats */}
-			<div className="bg-bark text-cream grid grid-cols-3 divide-x divide-tan/20">
-				{[
-					{ num: "100%", label: "Genuine Leather" },
-					{ num: "0", label: "Mass production — ever" },
-					{ num: "1", label: "Maker, one studio" },
-				].map(({ num, label }) => (
-					<div key={label} className="px-12 py-14 text-center">
-						<span className="font-display font-light text-[3.5rem] text-tan block mb-3 leading-none">
-							{num}
-						</span>
-						<p className="text-[0.75rem] tracking-[0.15em] uppercase text-cream/60">
-							{label}
-						</p>
-					</div>
-				))}
-			</div>
-
 			{/* Founder section */}
 			<div className="px-16 py-20 grid md:grid-cols-2 gap-16 items-center border-b border-tan/20">
 				{/* Photo */}
 				<div className="aspect-[4/5] bg-gradient-to-br from-tan-light to-tan overflow-hidden">
 					{/* Replace with her actual photo once uploaded */}
-					<div className="w-full h-full flex items-center justify-center text-[5rem] opacity-25">
-						📷
-					</div>
+					<img
+						className="w-full h-full flex items-center justify-center text-[5rem] opacity-80"
+						src="https://res.cloudinary.com/dfxorvtuc/image/upload/v1783963342/Request_Information_from_Joan_szjfdr.jpg"
+					/>
 				</div>
 
 				{/* Story */}
@@ -67,53 +35,26 @@ export default function About() {
 					</h2>
 					<div className="space-y-4 text-[0.93rem] leading-[1.9] text-bark-mid font-light">
 						<p>
-							[Her personal story goes here — how she got into leatherwork, what
-							drew her to it, and what the craft means to her. This is the
-							section where her voice should come through directly.]
+							Hloniphani Eva Chiane, the founder and maker behind Tjiane
+							Creations. My journey began with a simple belief: the things we
+							carry every day should be made to last and tell a story. After
+							more than 25 years in supply chain management, I followed my
+							passion for leather craftsmanship and turned it into a brand
+							dedicated to creating timeless pieces with purpose.
 						</p>
 						<p>
-							[A line or two about her process — working from a kitchen table,
-							learning by hand, the patience the craft demands.]
+							Every item is carefully handcrafted from genuine leather,
+							combining traditional craftsmanship with thoughtful design. I
+							don’t believe in fast fashion,I believe in creating pieces that
+							become part of your journey, grow more beautiful with time, and
+							can one day be passed on as a legacy.
 						</p>
 						<p>
-							[Optional closing line tying her personal mission to what
-							customers get when they buy from her.]
+							Tjiane Creations is more than a leather brand; it’s a celebration
+							of quality, authenticity, and the stories we carry with us. Thank
+							you for allowing my craft to become a part of yours.
 						</p>
 					</div>
-				</div>
-			</div>
-
-			{/* Story — why leather, why handmade */}
-			<div className="px-16 py-20 grid md:grid-cols-2 gap-20 items-start">
-				<div>
-					<span className="text-eyebrow text-tan-dark block mb-3">
-						The Story
-					</span>
-					<h2 className="font-display font-light text-[2rem] text-bark mb-6">
-						Why leather, why handmade?
-					</h2>
-					<div className="space-y-4 text-[0.93rem] leading-[1.9] text-bark-mid font-light">
-						<p>
-							It started with a single bag — cut from a remnant piece of hide
-							and stitched on a kitchen table in Brakpan. The process was
-							meditative, the result was something no factory could replicate.
-						</p>
-						<p>
-							Every Tjiane bag is designed to age beautifully. The leather
-							develops a patina unique to its owner. Scratches soften. The
-							surface deepens. It becomes more itself the more it's carried.
-						</p>
-						<p>
-							There are no machines, no teams, no cutting corners. Just
-							patience, sharp tools, and a commitment to making something that
-							lasts a lifetime.
-						</p>
-					</div>
-				</div>
-
-				{/* Visual placeholder */}
-				<div className="aspect-[4/5] bg-gradient-to-br from-tan-light to-tan flex items-center justify-center text-[6rem] opacity-30">
-					🤲
 				</div>
 			</div>
 

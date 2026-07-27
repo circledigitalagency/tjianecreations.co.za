@@ -1,18 +1,17 @@
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Link, useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import * as React from "react";
-import { Share2, Check, Link as LinkIcon, ArrowLeft } from "lucide-react";
+import { Share2, Check, ArrowLeft, SparkleIcon, Download } from "lucide-react";
 import MainLayout from "~/components/_layout/main";
 import { pool } from "~/db.server";
-import { Download } from "lucide-react";
 
 export async function loader({ params }: LoaderFunctionArgs) {
 	const { slug } = params;
 
 	const [[product]] = (await pool.query(
 		`SELECT
-      p.id, p.slug, p.name, p.base_price, p.description,
+      p.id, p.slug, p.name, p.base_price, p.description, p.colours, p.sizes,
       p.care_instructions, p.is_new, p.is_customisable,
       c.name  AS category_name,
       lt.name AS leather_type,
@@ -37,7 +36,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	return json({ product, images, appUrl });
 }
 
-// ✅ Open Graph meta tags — these control how the product looks when shared
+// Open Graph meta tags — these control how the product looks when shared
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
 	if (!data) return [];
 	const { product, images, appUrl } = data;
@@ -90,11 +89,50 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 
 export default function ProductDetail() {
 	const { product, images } = useLoaderData<typeof loader>();
+	const [selectedColour, setSelectedColour] = React.useState<string | null>(
+		null,
+	);
 	const [activeImage, setActiveImage] = React.useState(0);
 	const [copied, setCopied] = React.useState(false);
-	const [addedToCart, setAddedToCart] = React.useState(false);
+	const [selectedSize, setSelectedSize] = React.useState<string | null>(null);
 
 	const navigate = useNavigate();
+
+	// Parse "Mustard, Blue" -> ["Mustard", "Blue"]
+	const colourOptions: string[] = (product.colours ?? "")
+		.split(",")
+		.map((c: string) => c.trim())
+		.filter(Boolean);
+
+	// If the product has colour options, one must be picked before add-to-cart
+	const colourRequired = colourOptions.length > 0;
+
+	const sizeOptions: string[] = (product.sizes ?? "")
+		.split(",")
+		.map((s: string) => s.trim())
+		.filter(Boolean);
+
+	const sizeRequired = sizeOptions.length > 0;
+
+	const canAddToCart =
+		(!colourRequired || selectedColour !== null) &&
+		(!sizeRequired || selectedSize !== null);
+
+	// Keyboard navigation between images
+	React.useEffect(() => {
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === "ArrowRight") {
+				setActiveImage((prev) =>
+					Math.min(prev + 1, (images as any[]).length - 1),
+				);
+			}
+			if (e.key === "ArrowLeft") {
+				setActiveImage((prev) => Math.max(prev - 1, 0));
+			}
+		}
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [images]);
 
 	async function handleShare() {
 		const shareData = {
@@ -185,8 +223,8 @@ export default function ProductDetail() {
 								</span>
 							) : null}
 							{product.is_customisable ? (
-								<span className="border border-tan text-tan-dark text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
-									Customisable
+								<span className="flex space-x-2 border border-tan text-tan-dark text-[0.65rem] tracking-[0.15em] uppercase px-3 py-1">
+									<SparkleIcon className="w-4 h-4" /> <p>Customisable</p>
 								</span>
 							) : null}
 						</div>
@@ -214,34 +252,100 @@ export default function ProductDetail() {
 							</p>
 						)}
 
+						{/* Colour tags */}
+						{colourOptions.length > 0 && (
+							<div className="mb-6">
+								<p className="text-[0.7rem] tracking-[0.15em] uppercase text-bark-mid mb-2">
+									Colour
+									{selectedColour ? (
+										<span className="text-tan-dark ml-2 normal-case tracking-normal">
+											{selectedColour}
+										</span>
+									) : (
+										<span className="text-bark-mid/50 ml-2 normal-case tracking-normal">
+											— please select
+										</span>
+									)}
+								</p>
+								<div className="flex gap-2 flex-wrap">
+									{colourOptions.map((colour) => (
+										<button
+											key={colour}
+											type="button"
+											onClick={() => setSelectedColour(colour)}
+											className={`px-4 py-2 text-[0.75rem] tracking-[0.08em] uppercase border cursor-pointer transition-all duration-150 font-body ${
+												selectedColour === colour
+													? "bg-bark text-cream border-bark"
+													: "bg-transparent text-bark-mid border-bark-mid/40 hover:border-bark hover:text-bark"
+											}`}
+										>
+											{colour}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
+
+						{sizeOptions.length > 0 && (
+							<div className="mb-6">
+								<p className="text-[0.7rem] tracking-[0.15em] uppercase text-bark-mid mb-2">
+									Size
+									{selectedSize ? (
+										<span className="text-tan-dark ml-2 normal-case tracking-normal">
+											{selectedSize}
+										</span>
+									) : (
+										<span className="text-bark-mid/50 ml-2 normal-case tracking-normal">
+											— please select
+										</span>
+									)}
+								</p>
+								<div className="flex gap-2 flex-wrap">
+									{sizeOptions.map((size) => (
+										<button
+											key={size}
+											type="button"
+											onClick={() => setSelectedSize(size)}
+											className={`px-4 py-2 text-[0.75rem] tracking-[0.08em] uppercase border cursor-pointer transition-all duration-150 font-body ${
+												selectedSize === size
+													? "bg-bark text-cream border-bark"
+													: "bg-transparent text-bark-mid border-bark-mid/40 hover:border-bark hover:text-bark"
+											}`}
+										>
+											{size}
+										</button>
+									))}
+								</div>
+							</div>
+						)}
+
 						{/* Add to cart */}
 						<div className="flex gap-3 mb-6">
 							<form method="post" action="/cart/add" className="flex-1">
 								<input type="hidden" name="productId" value={product.id} />
 								<input
 									type="hidden"
+									name="colour"
+									value={selectedColour ?? ""}
+								/>
+								<input
+									type="hidden"
 									name="redirectTo"
 									value={`/shop/${product.slug}`}
 								/>
+								<input type="hidden" name="size" value={selectedSize ?? ""} />
 								<button
 									type="submit"
-									className="w-full bg-accent text-cream py-3.5 text-[0.8rem] tracking-[0.12em] uppercase hover:bg-bark transition-colors cursor-pointer border-0"
+									disabled={!canAddToCart}
+									className="w-full bg-accent text-cream py-3.5 text-[0.8rem] tracking-[0.12em] uppercase hover:bg-bark transition-colors cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed"
 								>
-									Add to Cart
+									{canAddToCart
+										? "Add to Cart"
+										: !selectedColour && colourRequired
+										? "Select a Colour"
+										: "Select a Size"}
 								</button>
 							</form>
-
-							{/* Size chart download — shown only for Kids Shoes */}
-							{product.category_name === "Kids Shoes" && (
-								<a
-									href="/size-charts/kids-shoes-printable-guide.pdf"
-									download
-									className="flex items-center gap-2 text-[0.78rem] text-accent hover:underline mb-6"
-								>
-									<Download size={15} />
-									Download Printable Foot Guide (PDF)
-								</a>
-							)}
 
 							{/* Share button */}
 							<button
@@ -267,6 +371,19 @@ export default function ProductDetail() {
 							</button>
 						</div>
 
+						{/* Size chart download — shown for Kids categories */}
+						{(product.category_name === "Kids Shoes" ||
+							product.category_name === "Baby Shoes") && (
+							<a
+								href="/size-charts/kids-shoes-printable-guide.pdf"
+								download
+								className="flex items-center gap-2 text-[0.78rem] text-accent hover:underline mb-6 no-underline"
+							>
+								<Download size={15} />
+								Download Printable Foot Guide (PDF)
+							</a>
+						)}
+
 						{/* Care instructions */}
 						{product.care_instructions && (
 							<div className="border-t border-tan/20 pt-5 mt-5">
@@ -282,85 +399,5 @@ export default function ProductDetail() {
 				</div>
 			</div>
 		</MainLayout>
-	);
-}
-
-function SocialShareButtons({ product }: { product: any }) {
-	const [url, setUrl] = React.useState("");
-
-	// Get the URL client-side only
-	React.useEffect(() => {
-		setUrl(window.location.href);
-	}, []);
-
-	const text = encodeURIComponent(
-		`Check out ${product.name} on Tjiane Creations — R ${Number(
-			product.base_price,
-		).toLocaleString("en-ZA")}`,
-	);
-	const encodedUrl = encodeURIComponent(url);
-
-	const platforms = [
-		{
-			name: "WhatsApp",
-			href: `https://wa.me/?text=${text}%20${encodedUrl}`,
-			bg: "bg-[#25D366]",
-			icon: "W",
-		},
-		{
-			name: "Facebook",
-			href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-			bg: "bg-[#1877F2]",
-			icon: "f",
-		},
-		{
-			name: "X / Twitter",
-			href: `https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`,
-			bg: "bg-[#000000]",
-			icon: "𝕏",
-		},
-		{
-			name: "Copy Link",
-			href: url,
-			bg: "bg-bark",
-			icon: <LinkIcon size={13} />,
-			isCopy: true,
-		},
-	];
-
-	const [copied, setCopied] = React.useState(false);
-
-	async function copyLink() {
-		await navigator.clipboard.writeText(url);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2500);
-	}
-
-	return (
-		<div className="flex gap-2 flex-wrap">
-			{platforms.map(({ name, href, bg, icon, isCopy }) =>
-				isCopy ? (
-					<button
-						key={name}
-						onClick={copyLink}
-						className={`${bg} text-white px-4 py-2 text-[0.72rem] tracking-wide uppercase flex items-center gap-2 cursor-pointer border-0 transition-opacity hover:opacity-80`}
-					>
-						{icon}
-						{copied ? "Copied!" : name}
-					</button>
-				) : (
-					<a
-						key={name}
-						href={href}
-						target="_blank"
-						rel="noopener noreferrer"
-						className={`${bg} text-white px-4 py-2 text-[0.72rem] tracking-wide uppercase flex items-center gap-2 no-underline transition-opacity hover:opacity-80`}
-					>
-						<span className="font-bold text-sm">{icon}</span>
-						{name}
-					</a>
-				),
-			)}
-		</div>
 	);
 }

@@ -5,18 +5,17 @@ import { pool } from "~/db.server";
 export async function loader({ params }: LoaderFunctionArgs) {
 	const [items] = (await pool.query(
 		`SELECT
-      oi.id,
-      oi.quantity,
-      oi.unit_price,
-      p.name  AS product_name,
-      c.name  AS colour,
-      s.label AS size
-    FROM order_items oi
-    JOIN product_variants pv ON oi.product_variant_id = pv.id
-    JOIN products p          ON pv.product_id = p.id
-    LEFT JOIN colours c      ON pv.colour_id = c.id
-    LEFT JOIN sizes s        ON pv.size_id = s.id
-    WHERE oi.order_id = ?`,
+    oi.id,
+    oi.quantity,
+    oi.unit_price,
+    p.name AS product_name,
+    oi.customisation_text AS colour,
+    (SELECT url FROM product_images pi
+     WHERE pi.product_id = p.id
+     ORDER BY pi.sort_order LIMIT 1) AS image_url
+  FROM order_items oi
+  JOIN products p ON oi.product_id = p.id
+  WHERE oi.order_id = ?`,
 		[params.id],
 	)) as any;
 

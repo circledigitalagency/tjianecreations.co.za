@@ -4,6 +4,11 @@ import { useLoaderData, Link, MetaFunction } from "@remix-run/react";
 import { CartItem, getSession, commitSession } from "~/cart.server";
 import MainLayout from "~/components/_layout/main";
 import { pool } from "~/db.server";
+import crypto from "crypto";
+import {
+	sendOrderConfirmationEmail,
+	sendNewOrderAdminNotification,
+} from "~/email.server";
 
 export const meta: MetaFunction = () => [
 	{ title: "Payment Successful" },
@@ -60,13 +65,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
 	let customerId: number;
 	if ((existing as any[]).length > 0) {
 		customerId = existing[0].id;
-	} else {
-		const [result] = (await pool.query(
-			"INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)",
+		await pool.query(
+			`UPDATE customers
+   SET marketing_opt_in = ?,
+       unsubscribe_token = COALESCE(unsubscribe_token, ?)
+   WHERE id = ?`,
 			[
-				checkout?.name ?? yocoData.metadata?.customerName,
-				checkout?.email ?? yocoData.metadata?.customerEmail,
-				checkout?.phone ?? yocoData.metadata?.customerPhone,
+				checkout.marketing_opt_in ? 1 : 0,
+				crypto.randomBytes(24).toString("hex"),
+				customerId,
+			],
+		);
+	} else {
+		const unsubToken = crypto.randomBytes(24).toString("hex");
+		const [result] = (await pool.query(
+			"INSERT INTO customers (name, email, phone, marketing_opt_in, unsubscribe_token) VALUES (?, ?, ?, ?, ?)",
+			[
+				checkout.name,
+				checkout.email,
+				checkout.phone,
+				checkout.marketing_opt_in ? 1 : 0,
+				unsubToken,
 			],
 		)) as any;
 		customerId = result.insertId;
@@ -134,6 +153,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
 					[item.quantity, item.variantId],
 				);
 			}
+		}
+
+		try {
+			await sendOrderConfirmationEmail({
+				id: orderId,
+				customerName: checkout?.name ?? yocoData.metadata?.customerName,
+				customerEmail: checkout?.email ?? yocoData.metadata?.customerEmail,
+				totalAmount: yocoData.amount / 100,
+				shippingMethod: shippingMethod,
+				shippingAddress: shippingAddress,
+				items: cart.map((item) => ({
+					name: item.name,
+					quantity: item.quantity,
+					price: item.price,
+					colour: item.colour,
+					size: item.size,
+				})),
+			});
+
+			await sendNewOrderAdminNotification({
+				id: orderId,
+				customerName: checkout?.name ?? yocoData.metadata?.customerName,
+				customerEmail: checkout?.email ?? yocoData.metadata?.customerEmail,
+				totalAmount: yocoData.amount / 100,
+				itemCount: cart.length,
+			});
+		} catch (e) {
+			console.error("Failed to send order emails:", e);
 		}
 	}
 

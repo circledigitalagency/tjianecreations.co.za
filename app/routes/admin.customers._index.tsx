@@ -4,6 +4,7 @@ import { useLoaderData } from "@remix-run/react";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
 import * as React from "react";
+import { FileDown } from "lucide-react";
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const url = new URL(request.url);
@@ -44,6 +45,15 @@ export default function AdminCustomers() {
 				<span className="text-sm text-bark-mid">
 					{(customers as any[]).length} total
 				</span>
+			</div>
+			<div className="justify-end w-full flex">
+				<a
+					href="/admin/export/orders"
+					className="flex items-center gap-2 border border-tan/40 text-bark-mid px-4 py-2 text-[0.75rem] tracking-[0.1em] uppercase no-underline hover:border-tan hover:text-bark transition-colors"
+				>
+					<FileDown size={14} />
+					Export Table
+				</a>
 			</div>
 
 			{/* Search */}

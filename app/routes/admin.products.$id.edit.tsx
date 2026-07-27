@@ -1,10 +1,7 @@
 import {
 	json,
 	redirect,
-	unstable_createFileUploadHandler,
 	unstable_parseMultipartFormData,
-	unstable_createMemoryUploadHandler,
-	unstable_composeUploadHandlers,
 } from "@remix-run/node";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
@@ -23,8 +20,11 @@ export async function loader({ params }: LoaderFunctionArgs) {
 	const [[product]] = (await pool.query("SELECT * FROM products WHERE id = ?", [
 		id,
 	])) as any;
+
+	if (!product) throw new Response("Product not found", { status: 404 });
+
 	const [images] = (await pool.query(
-		"SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order",
+		"SELECT id, url, alt_text, sort_order FROM product_images WHERE product_id = ? ORDER BY sort_order",
 		[id],
 	)) as any;
 	const [categories] = (await pool.query(
@@ -34,41 +34,61 @@ export async function loader({ params }: LoaderFunctionArgs) {
 		"SELECT id, name, is_vegan FROM leather_types",
 	)) as any;
 
-	if (!product) throw new Response("Product not found", { status: 404 });
-
 	return json({ product, images, categories, leatherTypes });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
 	const { id } = params;
+	const contentType = request.headers.get("content-type") ?? "";
 
-	const uploadHandler = unstable_composeUploadHandlers(
-		// Handle file fields — save to disk
-		unstable_createFileUploadHandler({
-			directory: path.join(process.cwd(), "public/images/products"),
-			maxPartSize: 5_000_000,
-			file: ({ filename }) => filename,
-		}),
-		// Handle all text fields — keep in memory
-		unstable_createMemoryUploadHandler(),
-	);
+	// Plain form post = delete image action
+	if (!contentType.includes("multipart/form-data")) {
+		const form = await request.formData();
+		if (form.get("_action") === "delete_image") {
+			const imageId = form.get("image_id");
+			await pool.query(
+				"DELETE FROM product_images WHERE id = ? AND product_id = ?",
+				[imageId, id],
+			);
+			return redirect(`/admin/products/${id}/edit`);
+		}
+	}
+
+	// Multipart = main save form, handled by the custom upload handler
+	const uploadHandler = async (part: any) => {
+		if (part.filename !== undefined) {
+			// It's a file field
+			if (!part.filename || part.filename === "") {
+				// Empty file input — drain and skip
+				for await (const _ of part.data) {
+					/* drain */
+				}
+				return "";
+			}
+
+			const bytes = [];
+			for await (const chunk of part.data) {
+				bytes.push(chunk);
+			}
+			const buffer = Buffer.concat(bytes);
+			const filePath = path.join(
+				process.cwd(),
+				"public/images/products",
+				part.filename,
+			);
+			await import("fs/promises").then((fs) => fs.writeFile(filePath, buffer));
+			return part.filename;
+		}
+
+		// Text field — read as string
+		const chunks = [];
+		for await (const chunk of part.data) {
+			chunks.push(chunk);
+		}
+		return Buffer.concat(chunks).toString("utf-8");
+	};
 
 	const form = await unstable_parseMultipartFormData(request, uploadHandler);
-
-	// Add this temporarily
-	console.log("form name:", form.get("name"));
-	console.log("form category:", form.get("category_id"));
-	console.log("form image:", form.get("image"));
-
-	// Check if this is a delete-image action
-	if (form.get("_action") === "delete_image") {
-		const imageId = form.get("image_id");
-		await pool.query(
-			"DELETE FROM product_images WHERE id = ? AND product_id = ?",
-			[imageId, id],
-		);
-		return redirect(`/admin/products/${id}/edit`);
-	}
 
 	const name = form.get("name") as string;
 	const slug = name
@@ -80,10 +100,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 	const base_price = parseFloat(form.get("base_price") as string);
 	const description = form.get("description");
 	const care = form.get("care_instructions");
+	const colours = (form.get("colours") as string)?.trim() || null;
+	const sizes = (form.get("sizes") as string)?.trim() || null;
 	const is_customisable = form.get("is_customisable") === "on" ? 1 : 0;
 	const is_new = form.get("is_new") === "on" ? 1 : 0;
 	const is_active = form.get("is_active") === "on" ? 1 : 0;
-	const image = form.get("image") as any;
 
 	if (!name || !category_id || isNaN(base_price)) {
 		return json(
@@ -94,7 +115,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 	await pool.query(
 		`UPDATE products SET
-      slug = ?, name = ?, category_id = ?, leather_type_id = ?,
+      slug = ?, name = ?, category_id = ?, leather_type_id = ?, colours = ?, sizes = ?,
       base_price = ?, description = ?, care_instructions = ?,
       is_customisable = ?, is_new = ?, is_active = ?
      WHERE id = ?`,
@@ -103,6 +124,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 			name,
 			category_id,
 			leather_type_id,
+			colours,
+			sizes,
 			base_price,
 			description,
 			care,
@@ -113,13 +136,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
 		],
 	);
 
-	// Add new image if uploaded
-	if (image?.name) {
-		const imageUrl = `/images/products/${image.name}`;
-		await pool.query(
-			"INSERT INTO product_images (product_id, url, alt_text, sort_order) VALUES (?, ?, ?, 0)",
-			[id, imageUrl, name],
-		);
+	// New images continue sort_order after existing ones
+	const [[{ maxSort }]] = (await pool.query(
+		"SELECT COALESCE(MAX(sort_order), -1) AS maxSort FROM product_images WHERE product_id = ?",
+		[id],
+	)) as any;
+
+	let sortOrder = maxSort + 1;
+	for (let i = 0; i < 5; i++) {
+		const filename = form.get(`image_${i}`) as string | null;
+		if (filename && filename !== "") {
+			const imageUrl = `/images/products/${filename}`;
+			await pool.query(
+				"INSERT INTO product_images (product_id, url, alt_text, sort_order) VALUES (?, ?, ?, ?)",
+				[id, imageUrl, name, sortOrder],
+			);
+			sortOrder++;
+		}
 	}
 
 	return redirect("/admin/products");
@@ -201,6 +234,34 @@ export default function EditProduct() {
 						</select>
 					</Field>
 
+					<Field label="Colours (comma separated)">
+						<input
+							name="colours"
+							type="text"
+							placeholder="e.g. Mustard, Blue"
+							defaultValue={product.colours ?? ""}
+							className="field"
+						/>
+						<p className="text-[0.72rem] text-bark-mid mt-1">
+							Customers will pick one of these when adding to cart. Leave empty
+							if the product comes in one colour only.
+						</p>
+					</Field>
+
+					<Field label="Sizes (comma separated)">
+						<input
+							name="sizes"
+							type="text"
+							placeholder="e.g. Size 1, Size 2, Size 3"
+							defaultValue={product?.sizes ?? ""}
+							className="field"
+						/>
+						<p className="text-[0.72rem] text-bark-mid mt-1">
+							Customers will pick one when adding to cart. Leave empty for
+							one-size items.
+						</p>
+					</Field>
+
 					<Field label="Description">
 						<textarea
 							name="description"
@@ -230,8 +291,13 @@ export default function EditProduct() {
 											alt={img.alt_text}
 											className="w-24 h-24 object-cover border border-tan/30 rounded"
 										/>
-										{/* Delete image button — separate form */}
-										<Form method="post" encType="multipart/form-data">
+										{img.sort_order === 0 && (
+											<span className="absolute bottom-1 left-1 bg-bark/70 text-cream text-[0.55rem] tracking-wide uppercase px-1.5 py-0.5 rounded-sm">
+												Hero
+											</span>
+										)}
+										{/* Delete image button — plain form (no multipart) */}
+										<Form method="post">
 											<input
 												type="hidden"
 												name="_action"
@@ -243,7 +309,7 @@ export default function EditProduct() {
 												className="absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-0 flex items-center justify-center"
 												title="Remove image"
 											>
-												<i className="ti ti-x" style={{ fontSize: 10 }} />
+												×
 											</button>
 										</Form>
 									</div>
@@ -252,22 +318,27 @@ export default function EditProduct() {
 						</Field>
 					)}
 
-					{/* Upload new image */}
-					<Field
-						label={images.length > 0 ? "Add Another Image" : "Product Image"}
-					>
-						<div className="border-2 border-dashed border-tan/40 rounded p-6 text-center hover:border-tan transition-colors">
-							<i className="ti ti-upload text-3xl text-tan-dark block mb-2" />
-							<input
-								type="file"
-								name="image"
-								accept="image/jpeg,image/png,image/webp"
-								className="w-full text-sm text-bark-mid cursor-pointer"
-							/>
-							<p className="text-[0.72rem] text-bark-mid mt-2">
-								JPG, PNG or WebP — max 5MB
-							</p>
+					{/* Image upload — up to 5 separate slots */}
+					<Field label="Add Images">
+						<div className="grid grid-cols-5 gap-3">
+							{[0, 1, 2, 3, 4].map((i) => (
+								<div
+									key={i}
+									className="border-2 border-dashed border-tan/40 rounded p-3 text-center hover:border-tan transition-colors"
+								>
+									<input
+										type="file"
+										name={`image_${i}`}
+										accept="image/jpeg,image/png,image/webp"
+										className="w-full text-[0.65rem] text-bark-mid cursor-pointer"
+									/>
+								</div>
+							))}
 						</div>
+						<p className="text-[0.72rem] text-bark-mid mt-2">
+							JPG, PNG or WebP — max 5MB each. New images are added after the
+							existing ones.
+						</p>
 					</Field>
 
 					<div className="flex gap-8">

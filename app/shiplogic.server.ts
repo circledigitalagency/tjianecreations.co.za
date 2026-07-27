@@ -1,4 +1,4 @@
-const BASE_URL = "https://api.shiplogic.com";
+const BASE_URL = "https://api.shiplogic.com/v2";
 const API_KEY = process.env.SHIPLOGIC_API_KEY ?? "";
 
 const headers = {
@@ -27,7 +27,7 @@ export async function getRates({
 	height?: number;
 }) {
 	const res = await fetch(`${BASE_URL}/rates`, {
-		method: "GET",
+		method: "POST",
 		headers,
 		body: JSON.stringify({
 			collection_address: {

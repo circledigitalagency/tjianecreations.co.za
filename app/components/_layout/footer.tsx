@@ -16,7 +16,6 @@ const serviceLinks = [
 const infoLinks = [
 	{ label: "About", to: "/about" },
 	{ label: "Shipping & Returns", to: "/shipping" },
-	{ label: "FAQ", to: "/faq" },
 	{ label: "Review", to: "/review" },
 ];
 

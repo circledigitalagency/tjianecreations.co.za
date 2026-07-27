@@ -1,9 +1,30 @@
-import { json } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
+import { ActionFunctionArgs, json } from "@remix-run/node";
+import { useLoaderData, Link, Form } from "@remix-run/react";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
-import { Share2, Pencil, Check } from "lucide-react";
+import { Share2, Pencil, Check, Trash2, FileDown } from "lucide-react";
 import { useState } from "react";
+
+export async function action({ request }: ActionFunctionArgs) {
+	const form = await request.formData();
+	const _action = form.get("_action") as string;
+	const productId = form.get("productId") as string;
+
+	if (_action === "delete") {
+		// Delete related images first (foreign key constraint)
+		await pool.query("DELETE FROM product_images WHERE product_id = ?", [
+			productId,
+		]);
+		// Delete related variants if any
+		await pool.query("DELETE FROM product_variants WHERE product_id = ?", [
+			productId,
+		]);
+		// Delete the product itself
+		await pool.query("DELETE FROM products WHERE id = ?", [productId]);
+	}
+
+	return json({ ok: true });
+}
 
 export async function loader() {
 	const [products] = await pool.query(`
@@ -30,6 +51,16 @@ export default function ProductsList() {
 				>
 					+ Add Product
 				</Link>
+			</div>
+
+			<div className="justify-start mb-4 w-full flex">
+				<a
+					href="/admin/export/orders"
+					className="flex items-center gap-2 border border-tan/40 text-bark-mid px-4 py-2 text-[0.75rem] tracking-[0.1em] uppercase no-underline hover:border-tan hover:text-bark transition-colors"
+				>
+					<FileDown size={14} />
+					Export Table
+				</a>
 			</div>
 
 			<div className="bg-white border border-tan/30 rounded overflow-hidden">
@@ -97,6 +128,28 @@ export default function ProductsList() {
 									>
 										Edit
 									</Link>
+
+									{/* Delete */}
+									<Form
+										method="post"
+										onSubmit={(e) => {
+											if (
+												!confirm(`Delete "${p.name}"? This can't be undone.`)
+											) {
+												e.preventDefault();
+											}
+										}}
+									>
+										<input type="hidden" name="_action" value="delete" />
+										<input type="hidden" name="productId" value={p.id} />
+										<button
+											type="submit"
+											className="text-red-500 text-xs hover:text-red-700 transition-colors cursor-pointer bg-transparent border-0"
+											title="Delete product"
+										>
+											Delete
+										</button>
+									</Form>
 								</td>
 							</tr>
 						))}

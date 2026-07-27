@@ -75,12 +75,18 @@ export async function action({ request }: ActionFunctionArgs) {
 	return json<ActionResult>({ success: true, enquiryId });
 }
 
-const bagStyleOptions = [
-	"Tote Bag",
-	"Clutch Bag",
-	"Crossbody",
-	"Backpack",
-	"Keychain",
+const itemOptions = [
+	"Tote Bags",
+	"Clutch Bags",
+	"Crossbody Bags",
+	"Backpacks",
+	"Baby Shoes",
+	"Book Covers",
+	"Laptop Sleeves",
+	"Keychains",
+	"Bookmarks",
+	"Belts",
+	"Bible Covers / Bags",
 	"Mixed / Not sure yet",
 ];
 
@@ -283,10 +289,10 @@ export default function Corporate() {
 										className="form-field"
 									/>
 								</FormRow>
-								<FormRow label="Preferred Bag Style">
+								<FormRow label="Item(s) Required">
 									<select name="bag_style" className="form-field">
-										<option value="">Select a style…</option>
-										{bagStyleOptions.map((s) => (
+										<option value="">Select an item type…</option>
+										{itemOptions.map((s) => (
 											<option key={s}>{s}</option>
 										))}
 									</select>

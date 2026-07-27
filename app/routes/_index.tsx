@@ -59,8 +59,7 @@ export default function Index() {
 					<h1 className="font-display font-light text-[clamp(3rem,5vw,5.5rem)] leading-[1.1] text-bark mb-6">
 						Bags made
 						<br />
-						to{" "}
-						<em className="italic text-accent not-italic font-light">carry</em>
+						to <em className="italic text-accent font-light">carry</em>
 						<br />
 						your story.
 					</h1>
@@ -88,10 +87,7 @@ export default function Index() {
 				{/* Right — image placeholder */}
 				<div className="relative overflow-hidden bg-tan-light min-h-[400px]">
 					<div className="w-full h-full bg-tan-gradient flex flex-col items-center justify-center gap-4">
-						<span className="text-[5rem] opacity-40">👜</span>
-						<p className="font-display italic text-bark opacity-50">
-							Your product photo here
-						</p>
+						<img src="https://res.cloudinary.com/dfxorvtuc/image/upload/v1784046708/Logo_Favicon_5_suzk5b.png" />
 					</div>
 					<div className="absolute bottom-10 left-10 bg-bark text-cream px-6 py-4 max-w-[200px] font-display italic leading-[1.5]">
 						Genuine leather, handcrafted in South Africa

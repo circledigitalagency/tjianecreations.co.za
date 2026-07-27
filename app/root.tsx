@@ -12,9 +12,25 @@ import "./tailwind.css";
 import "./global.css";
 import { getCart } from "~/cart.server";
 
+import { pool } from "~/db.server";
+
 export async function loader({ request }: LoaderFunctionArgs) {
 	const cart = await getCart(request);
-	return json({ cartCount: cart.reduce((s, i) => s + i.quantity, 0) });
+	const [categories] = (await pool.query(
+		`SELECT c.id, c.slug, c.name
+   FROM categories c
+   WHERE c.is_active = 1
+   AND EXISTS (
+     SELECT 1 FROM products p
+     WHERE p.category_id = c.id
+     AND p.is_active = 1
+   )
+   ORDER BY c.sort_order`,
+	)) as any;
+	return json({
+		cartCount: cart.reduce((s, i) => s + i.quantity, 0),
+		categories,
+	});
 }
 
 export const links: LinksFunction = () => [

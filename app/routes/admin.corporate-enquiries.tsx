@@ -174,7 +174,7 @@ function EnquiryCard({ enquiry }: { enquiry: any }) {
 									step="0.01"
 									defaultValue={enquiry.budget ?? ""}
 									required
-									className="w-full border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan"
+									className="w-full bg-cream border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan"
 								/>
 							</div>
 							<div>
@@ -184,7 +184,7 @@ function EnquiryCard({ enquiry }: { enquiry: any }) {
 								<textarea
 									name="notes"
 									rows={2}
-									className="w-full border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan resize-y"
+									className="w-full bg-cream border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan resize-y"
 								/>
 							</div>
 							<button
@@ -206,7 +206,7 @@ function EnquiryCard({ enquiry }: { enquiry: any }) {
 									name="status"
 									defaultValue={enquiry.status}
 									onChange={(e) => e.currentTarget.form?.requestSubmit()}
-									className="w-full border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan"
+									className="w-full bg-cream border border-tan/40 px-3 py-2 text-sm outline-none focus:border-tan"
 								>
 									{Object.keys(statusColors).map((s) => (
 										<option key={s} value={s}>

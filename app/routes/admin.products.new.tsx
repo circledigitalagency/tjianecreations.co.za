@@ -1,10 +1,7 @@
 import {
 	json,
 	redirect,
-	unstable_createFileUploadHandler,
 	unstable_parseMultipartFormData,
-	unstable_createMemoryUploadHandler,
-	unstable_composeUploadHandlers,
 } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import {
@@ -16,28 +13,53 @@ import {
 import path from "path";
 import AdminLayout from "~/components/_layout/admin";
 import { pool } from "~/db.server";
+import { sendNewDropEmails } from "~/email.server";
 
 export async function loader() {
-	const [categories] = await pool.query(
+	const [categories] = (await pool.query(
 		"SELECT id, name FROM categories ORDER BY name",
-	);
-	const [leatherTypes] = await pool.query(
+	)) as any;
+	const [leatherTypes] = (await pool.query(
 		"SELECT id, name, is_vegan FROM leather_types",
-	);
+	)) as any;
 	return json({ categories, leatherTypes });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-	const uploadHandler = unstable_composeUploadHandlers(
-		// Handle file fields — save to disk
-		unstable_createFileUploadHandler({
-			directory: path.join(process.cwd(), "public/images/products"),
-			maxPartSize: 5_000_000,
-			file: ({ filename }) => filename,
-		}),
-		// Handle all text fields — keep in memory
-		unstable_createMemoryUploadHandler(),
-	);
+	// Custom upload handler — files write to disk, form.get() returns the
+	// filename string; text fields return their values; empty slots return ""
+	const uploadHandler = async (part: any) => {
+		if (part.filename !== undefined) {
+			// It's a file field
+			if (!part.filename || part.filename === "") {
+				// Empty file input — drain and skip
+				for await (const _ of part.data) {
+					/* drain */
+				}
+				return "";
+			}
+
+			const bytes = [];
+			for await (const chunk of part.data) {
+				bytes.push(chunk);
+			}
+			const buffer = Buffer.concat(bytes);
+			const filePath = path.join(
+				process.cwd(),
+				"public/images/products",
+				part.filename,
+			);
+			await import("fs/promises").then((fs) => fs.writeFile(filePath, buffer));
+			return part.filename;
+		}
+
+		// Text field — read as string
+		const chunks = [];
+		for await (const chunk of part.data) {
+			chunks.push(chunk);
+		}
+		return Buffer.concat(chunks).toString("utf-8");
+	};
 
 	const form = await unstable_parseMultipartFormData(request, uploadHandler);
 
@@ -51,9 +73,10 @@ export async function action({ request }: ActionFunctionArgs) {
 	const base_price = parseFloat(form.get("base_price") as string);
 	const description = form.get("description");
 	const care = form.get("care_instructions");
+	const colours = (form.get("colours") as string)?.trim() || null;
+	const sizes = (form.get("sizes") as string)?.trim() || null;
 	const is_customisable = form.get("is_customisable") === "on" ? 1 : 0;
 	const is_new = form.get("is_new") === "on" ? 1 : 0;
-	const image = form.get("image") as any;
 
 	if (!name || !category_id || isNaN(base_price)) {
 		return json(
@@ -65,13 +88,15 @@ export async function action({ request }: ActionFunctionArgs) {
 	// Insert product
 	const [result] = (await pool.query(
 		`INSERT INTO products
-      (slug, name, category_id, leather_type_id, base_price, description, care_instructions, is_customisable, is_new)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (slug, name, category_id, leather_type_id, colours, sizes, base_price, description, care_instructions, is_customisable, is_new)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			slug,
 			name,
 			category_id,
 			leather_type_id,
+			colours,
+			sizes,
 			base_price,
 			description,
 			care,
@@ -80,13 +105,42 @@ export async function action({ request }: ActionFunctionArgs) {
 		],
 	)) as any;
 
-	// If an image was uploaded, save it to product_images
-	if (image?.name) {
-		const imageUrl = `/images/products/${image.name}`;
-		await pool.query(
-			"INSERT INTO product_images (product_id, url, alt_text, sort_order) VALUES (?, ?, ?, 0)",
-			[result.insertId, imageUrl, name],
-		);
+	const productId = result.insertId;
+
+	// Save uploaded images — first filled slot becomes the hero (sort_order 0)
+	let sortOrder = 0;
+	for (let i = 0; i < 5; i++) {
+		const filename = form.get(`image_${i}`) as string | null;
+		if (filename && filename !== "") {
+			const imageUrl = `/images/products/${filename}`;
+			try {
+				await pool.query(
+					"INSERT INTO product_images (product_id, url, alt_text, sort_order) VALUES (?, ?, ?, ?)",
+					[productId, imageUrl, name, sortOrder],
+				);
+				sortOrder++;
+			} catch (err) {
+				console.error(`Failed to save image ${sortOrder}:`, err);
+			}
+		}
+	}
+
+	// After the image loop, before redirect:
+	if (form.get("notify_subscribers") === "on") {
+		// Get the hero image we just saved
+		const [[heroImage]] = (await pool.query(
+			"SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order LIMIT 1",
+			[productId],
+		)) as any;
+
+		const sent = await sendNewDropEmails({
+			name,
+			slug,
+			price: base_price,
+			imageUrl: heroImage?.url ?? null,
+			description: (description as string) || null,
+		});
+		console.log(`New drop email sent to ${sent} subscribers`);
 	}
 
 	return redirect("/admin/products");
@@ -116,7 +170,6 @@ export default function NewProduct() {
 					</div>
 				)}
 
-				{/* encType is required for file uploads */}
 				<Form method="post" encType="multipart/form-data" className="space-y-6">
 					<Field label="Product Name *">
 						<input
@@ -162,6 +215,32 @@ export default function NewProduct() {
 						</select>
 					</Field>
 
+					<Field label="Colours (comma separated)">
+						<input
+							name="colours"
+							type="text"
+							placeholder="e.g. Mustard, Blue"
+							className="field"
+						/>
+						<p className="text-[0.72rem] text-bark-mid mt-1">
+							Customers will pick one of these when adding to cart. Leave empty
+							if the product comes in one colour only.
+						</p>
+					</Field>
+
+					<Field label="Sizes (comma separated)">
+						<input
+							name="sizes"
+							type="text"
+							placeholder="e.g. Size 1, Size 2, Size 3"
+							className="field"
+						/>
+						<p className="text-[0.72rem] text-bark-mid mt-1">
+							Customers will pick one when adding to cart. Leave empty for
+							one-size items.
+						</p>
+					</Field>
+
 					<Field label="Description">
 						<textarea
 							name="description"
@@ -180,20 +259,30 @@ export default function NewProduct() {
 						/>
 					</Field>
 
-					{/* Image upload */}
-					<Field label="Product Image">
-						<div className="border-2 border-dashed border-tan/40 rounded p-6 text-center hover:border-tan transition-colors">
-							<i className="ti ti-upload text-3xl text-tan-dark block mb-2" />
-							<input
-								type="file"
-								name="image"
-								accept="image/jpeg,image/png,image/webp"
-								className="w-full text-sm text-bark-mid cursor-pointer"
-							/>
-							<p className="text-[0.72rem] text-bark-mid mt-2">
-								JPG, PNG or WebP — max 5MB
-							</p>
+					{/* Image upload — up to 5 separate slots */}
+					<Field label="Product Images">
+						<div className="grid grid-cols-5 gap-3">
+							{[0, 1, 2, 3, 4].map((i) => (
+								<div
+									key={i}
+									className="border-2 border-dashed border-tan/40 rounded p-3 text-center hover:border-tan transition-colors"
+								>
+									<input
+										type="file"
+										name={`image_${i}`}
+										accept="image/jpeg,image/png,image/webp"
+										className="w-full text-[0.65rem] text-bark-mid cursor-pointer"
+									/>
+									{i === 0 && (
+										<p className="text-[0.6rem] text-tan-dark mt-1">Hero</p>
+									)}
+								</div>
+							))}
 						</div>
+						<p className="text-[0.72rem] text-bark-mid mt-2">
+							JPG, PNG or WebP — max 5MB each. First slot becomes the hero
+							photo.
+						</p>
 					</Field>
 
 					<div className="flex gap-8">
@@ -209,6 +298,14 @@ export default function NewProduct() {
 						<label className="flex items-center gap-2 text-sm text-bark cursor-pointer">
 							<input type="checkbox" name="is_new" className="accent-accent" />
 							Mark as New
+						</label>
+						<label className="flex items-center gap-2 text-sm text-bark cursor-pointer">
+							<input
+								type="checkbox"
+								name="notify_subscribers"
+								className="accent-accent"
+							/>
+							Notify subscribers (New Drop email)
 						</label>
 					</div>
 

@@ -31,6 +31,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 	// Store customer details in session for payment step
 	const session = await getSession(request.headers.get("Cookie"));
+	const marketing_opt_in = form.get("marketing_opt_in") === "on";
 	session.set("checkout", {
 		name,
 		email,
@@ -40,6 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		province,
 		postal,
 		shipping,
+		marketing_opt_in,
 	});
 
 	return redirect("/checkout/payment", {
@@ -193,6 +195,19 @@ export default function Checkout() {
 									</label>
 								))}
 							</div>
+
+							<label className="flex items-start gap-3 text-[0.82rem] text-bark-mid cursor-pointer">
+								<input
+									type="checkbox"
+									name="marketing_opt_in"
+									defaultChecked
+									className="accent-accent mt-0.5"
+								/>
+								<span>
+									Email me when new pieces drop. Unsubscribe anytime with one
+									click.
+								</span>
+							</label>
 
 							<div className="flex gap-4 pt-4">
 								<button

@@ -1,26 +1,102 @@
-import { Link, NavLink } from "@remix-run/react";
-import { useRouteLoaderData } from "@remix-run/react";
-import { ShoppingCartIcon } from "lucide-react";
+import { useState } from "react";
+import { Link, NavLink, useRouteLoaderData } from "@remix-run/react";
+import { ChevronDown, ShoppingCartIcon } from "lucide-react";
+
+interface Category {
+	id: number;
+	slug: string;
+	name: string;
+	parent_id: number | null;
+}
 
 const navItems = [
 	{ label: "Custom Orders", to: "/custom" },
-	{ label: "Repairs & Care", to: "/repairs" },
 	{ label: "Corporate", to: "/corporate" },
+	{ label: "Repairs", to: "/repairs" },
 	{ label: "About", to: "/about" },
 ];
 
 export default function Header() {
+	const [shopOpen, setShopOpen] = useState(false);
+	const rootData = useRouteLoaderData("root") as
+		| { categories: Category[] }
+		| undefined;
+	const categories = rootData?.categories ?? [];
 	const root = useRouteLoaderData("root") as { cartCount: number };
+
+	const shopGroups = [
+		{
+			label: "Shop",
+			items: categories.map((c: any) => ({
+				label: c.name,
+				to: `/shop?category=${c.slug}`,
+			})),
+		},
+	];
 
 	return (
 		<nav className="fixed top-0 w-full z-50 flex items-center justify-between px-12 py-[1.4rem] bg-cream/[0.92] backdrop-blur-sm border-b border-tan/30">
-			<Link to="/" className="flex items-center ">
-				<img className="w-20 h-20" src="/logo.png" />
-				<p className="font-display text-2xl font-semibold tracking-[0.05em] text-bark">
-					Tjiane <span className="text-accent italic">Creations</span>
-				</p>
+			<Link
+				to="/"
+				className="font-display text-2xl font-semibold tracking-[0.05em] text-bark"
+			>
+				Tjiane <span className="text-accent italic">Creations</span>
 			</Link>
-			<ul className="hidden md:flex gap-10 list-none">
+
+			<ul className="hidden md:flex gap-8 list-none items-center">
+				{/* Shop dropdown */}
+				<li
+					className="relative"
+					onMouseEnter={() => setShopOpen(true)}
+					onMouseLeave={() => setShopOpen(false)}
+				>
+					<button className="flex items-center gap-1.5 text-nav text-bark-mid hover:text-accent transition-colors duration-200 bg-transparent border-0 cursor-pointer py-2">
+						Shop
+						<ChevronDown
+							size={13}
+							className={`transition-transform duration-200 ${
+								shopOpen ? "rotate-180" : ""
+							}`}
+						/>
+					</button>
+
+					{shopOpen && (
+						<div className="absolute top-full left-1/2 -translate-x-1/2 pt-3 w-[560px]">
+							<div className="bg-cream-white border border-tan/30 shadow-lg p-6 grid grid-cols-3 gap-6">
+								{shopGroups.map((group) => (
+									<div key={group.label}>
+										<p className="text-[0.68rem] tracking-[0.15em] uppercase text-tan-dark mb-3 font-medium">
+											{group.label}
+										</p>
+										<ul className="flex flex-col gap-2">
+											{group.items.map((item) => (
+												<li key={item.to}>
+													<Link
+														to={item.to}
+														className="text-[0.82rem] text-bark-mid hover:text-accent no-underline transition-colors block"
+													>
+														{item.label}
+													</Link>
+												</li>
+											))}
+										</ul>
+									</div>
+								))}
+							</div>
+
+							{/* View all link spanning the bottom */}
+							<div className="bg-cream-white border-t border-tan/20 px-6 py-3">
+								<Link
+									to="/shop"
+									className="text-[0.75rem] text-accent hover:underline no-underline"
+								>
+									View All Products →
+								</Link>
+							</div>
+						</div>
+					)}
+				</li>
+
 				{navItems.map(({ label, to }) => (
 					<li key={to}>
 						<NavLink
@@ -57,7 +133,8 @@ export default function Header() {
 					</Link>
 				</li>
 			</ul>
-			{/* Mobile: hamburger placeholder */}
+
+			{/* Mobile hamburger — unchanged */}
 			<button className="md:hidden text-bark" aria-label="Open menu">
 				<svg
 					width="24"
