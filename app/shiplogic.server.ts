@@ -1,5 +1,6 @@
 const BASE_URL = "https://api.shiplogic.com/v2";
-const API_KEY = process.env.SHIPLOGIC_API_KEY ?? "";
+const API_KEY = process.env.SANDBOX_SHIPLOGIC_API_KEY ?? "";
+// const API_KEY = process.env.SHIPLOGIC_API_KEY ?? "";
 
 const headers = {
 	Authorization: `Bearer ${API_KEY}`,
@@ -78,8 +79,9 @@ export async function createShipment({
 			submitted_weight_kg: 1,
 		},
 	],
-	serviceLevel = "LOX", // LOX = Local Overnight Express, LOF = Local Overnight Flyer
-}: {
+	serviceLevel = "ECO",
+}: //serviceLevel = "LOX", // LOX = Local Overnight Express, LOF = Local Overnight Flyer
+{
 	orderId: number;
 	customerName: string;
 	customerPhone: string;
@@ -92,12 +94,13 @@ export async function createShipment({
 	parcels?: any[];
 	serviceLevel?: string;
 }) {
+	console.log("BASE_URL: ", BASE_URL);
+	console.log("API_KEY: ", API_KEY);
 	const res = await fetch(`${BASE_URL}/shipments`, {
 		method: "POST",
 		headers,
 		body: JSON.stringify({
 			service_level_code: serviceLevel,
-			custom_tracking_reference: `TJIANE-${orderId}`,
 			collection_address: {
 				street_address: process.env.COURIER_GUY_COLLECTION_ADDRESS,
 				local_area: process.env.COURIER_GUY_COLLECTION_SUBURB,
@@ -126,8 +129,23 @@ export async function createShipment({
 			parcels,
 			opt_in_rates: [],
 			opt_in_time_based_rates: [],
+			test: true,
 		}),
 	});
+
+	const text = await res.text();
+
+	if (!res.ok) {
+		console.error("Courier Guy API error:", res.status, text);
+		throw new Error(`Courier Guy API error ${res.status}: ${text}`);
+	}
+
+	try {
+		return JSON.parse(text);
+	} catch (e) {
+		console.error("Failed to parse Courier Guy response:", text);
+		throw new Error(`Invalid JSON from Courier Guy: ${text}`);
+	}
 
 	return res.json();
 }

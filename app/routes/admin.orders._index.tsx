@@ -630,6 +630,8 @@ function OrderItems({ orderId }: { orderId: number }) {
 	if (items.length === 0)
 		return <p className="text-sm text-bark-mid/60 italic">No items found.</p>;
 
+	console.log("items: ", items);
+
 	return (
 		<div className="space-y-3">
 			{items.map((item) => (
@@ -658,6 +660,11 @@ function OrderItems({ orderId }: { orderId: number }) {
 							<span className="text-[0.72rem] text-bark-mid">
 								{item.colour}
 							</span>
+						)}
+						{item.customisation_text && (
+							<p className="text-[0.72rem] text-tan-dark mt-0.5">
+								{item.customisation_text}
+							</p>
 						)}
 					</div>
 

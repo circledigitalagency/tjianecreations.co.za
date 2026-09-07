@@ -23,6 +23,7 @@ export interface CartItem {
 	imageUrl: string | null;
 	colour: string | null;
 	size: string | null;
+	customisationText: string | null;
 }
 
 export async function getCart(request: Request): Promise<CartItem[]> {

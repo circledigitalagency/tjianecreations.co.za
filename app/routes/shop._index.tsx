@@ -197,20 +197,29 @@ export default function Shop() {
 										<span className="font-display font-semibold text-[1.2rem] text-bark">
 											R {Number(product.base_price).toLocaleString("en-ZA")}
 										</span>
-										<Form method="post" action="/cart/add">
-											<input
-												type="hidden"
-												name="productId"
-												value={product.id}
-											/>
-											<input type="hidden" name="redirectTo" value="/shop" />
-											<button
-												type="submit"
-												className="bg-bark text-cream py-2 px-4 text-[0.72rem] tracking-[0.1em] uppercase font-body transition-colors hover:bg-accent cursor-pointer border-0"
+										{product.category_name === "Hats" ? (
+											<Form method="post" action="/cart/add">
+												<input
+													type="hidden"
+													name="productId"
+													value={product.id}
+												/>
+												<input type="hidden" name="redirectTo" value="/shop" />
+												<button
+													type="submit"
+													className="bg-bark text-cream py-2 px-4 text-[0.72rem] tracking-[0.1em] uppercase font-body transition-colors hover:bg-accent cursor-pointer border-0"
+												>
+													Add to Cart
+												</button>
+											</Form>
+										) : (
+											<Link
+												to={`/shop/${product.slug}`}
+												className="bg-bark text-cream py-2 px-4 text-[0.72rem] tracking-[0.1em] uppercase font-body transition-colors hover:bg-accent no-underline"
 											>
-												Add to Cart
-											</button>
-										</Form>
+												Customise
+											</Link>
+										)}
 									</div>
 								</div>
 							</div>

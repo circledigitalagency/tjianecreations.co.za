@@ -170,7 +170,7 @@ export default function Checkout() {
 									{
 										value: "courier_guy",
 										label: "The Courier Guy",
-										detail: "3–5 business days · R 120",
+										detail: "3–5 business days · From R 120",
 									},
 								].map((opt) => (
 									<label

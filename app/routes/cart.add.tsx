@@ -7,6 +7,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	const form = await request.formData();
 
 	const productId = parseInt(form.get("productId") as string);
+	const customisation = (form.get("customisation") as string)?.trim() || null;
 	const variantId = form.get("variantId")
 		? parseInt(form.get("variantId") as string)
 		: null;
@@ -55,6 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
 		imageUrl: product.image_url,
 		colour,
 		size,
+		customisationText: customisation || null,
 	});
 
 	// Redirect back with the Set-Cookie header from addToCart

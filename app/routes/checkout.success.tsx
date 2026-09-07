@@ -135,14 +135,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 		// Save order items
 		for (const item of cart) {
 			await pool.query(
-				`INSERT INTO order_items (order_id, product_id, product_variant_id, quantity, unit_price)
-     VALUES (?, ?, ?, ?, ?)`,
+				`INSERT INTO order_items (order_id, product_id, quantity, unit_price, customisation_text)
+   VALUES (?, ?, ?, ?, ?)`,
 				[
 					orderId,
 					item.productId,
-					item.variantId ?? null,
 					item.quantity,
 					item.price,
+					item.customisationText ?? null,
 				],
 			);
 
