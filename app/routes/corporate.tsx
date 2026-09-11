@@ -154,28 +154,23 @@ export default function Corporate() {
 							handcrafted leather bag bearing your logo or message. Minimum
 							quantities apply — get in touch to discuss your brief.
 						</p>
+					</div>
 
+					{/* Visual */}
+					<div className="aspect-square bg-gradient-to-br from-cream to-tan-light flex items-center justify-center text-[5rem] relative overflow-hidden">
 						{/* Perks as a compact inline list */}
 						<div className="grid grid-cols-2 gap-4">
 							{perks.map(({ title, desc }) => (
 								<div key={title} className="border-l-2 border-tan pl-3">
-									<div className="font-display font-semibold text-[0.9rem] text-bark mb-0.5">
+									<div className="font-display font-semibold text-[1rem] text-bark mb-0.5">
 										{title}
 									</div>
-									<div className="text-[0.75rem] text-bark-mid leading-[1.5]">
+									<div className="text-[0.9rem] text-bark-mid leading-[1.5]">
 										{desc}
 									</div>
 								</div>
 							))}
 						</div>
-					</div>
-
-					{/* Visual */}
-					<div className="aspect-square bg-gradient-to-br from-cream to-tan-light flex items-center justify-center text-[5rem] opacity-35 relative overflow-hidden">
-						💼
-						<span className="absolute bottom-8 right-8 font-display italic text-[1.2rem] text-bark-mid opacity-60">
-							For Business
-						</span>
 					</div>
 				</div>
 			</div>
